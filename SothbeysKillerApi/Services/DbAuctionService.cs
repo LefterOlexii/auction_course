@@ -11,7 +11,7 @@ public class DbAuctionService : IAuctionService
 
     public DbAuctionService()
     {
-        _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=auction_db;Username=postgres;Password=123456");
+        _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=postgres;Username=postgres;Password=root");
         _dbConnection.Open();
     }
 
@@ -80,7 +80,7 @@ public class DbAuctionService : IAuctionService
         };
 
         // sql injection
-        
+
         var command = $@"insert into auctions (id, title, start, finish) values (@Id, @Title, @Start, @Finish) returning id;";
         
         var id = _dbConnection.ExecuteScalar<Guid>(command, auction);

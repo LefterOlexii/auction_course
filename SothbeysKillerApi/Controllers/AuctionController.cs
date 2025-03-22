@@ -114,7 +114,7 @@ public class AuctionController : ControllerBase
 
             return NoContent();
         }
-        catch (NullReferenceException)
+        catch (NullReferenceException )
         {
             return NotFound();
         }

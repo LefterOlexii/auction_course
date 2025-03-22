@@ -10,7 +10,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddTransient<IAuctionService, DbAuctionService>();
-
+builder.Services.AddTransient<IUserService, DbUserService>();
 /*
  * Transient
  * Scoped

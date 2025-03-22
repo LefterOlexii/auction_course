@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
+using SothbeysKillerApi.Services;
 
 namespace SothbeysKillerApi.Controllers;
 
@@ -24,6 +25,12 @@ public class UserController : ControllerBase
 {
     
     private static List<User> _storage = [];
+    private readonly IUserService _userService;
+
+    public UserController(IUserService userService)
+    {
+        _userService = userService;
+    }
     
     [HttpPost]
     [Route("[action]")]
@@ -31,50 +38,12 @@ public class UserController : ControllerBase
     {
         try
         {
-            var errors = new List<object>();
-            
-            if (request.Name.Length < 3 || request.Name.Length > 255)
-            {
-                errors.Add(new { target = "Name", description = "Name must be between 3 and 255 characters" });
-            }
-            
-            if (!Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
-            {
-                errors.Add(new { target = "Email", description = "Invalid email address" });
-            }
-            if (_storage.Any(user => user.Email == request.Email))
-            {
-                errors.Add(new { target = "Email", description = "Email is already taken" });
-            }
-            
-            if (request.Password.Length < 8 || 
-                !Regex.IsMatch(request.Password, @"[a-z]") || 
-                !Regex.IsMatch(request.Password, @"[A-Z]") || 
-                !Regex.IsMatch(request.Password, @"[!@#$%^&*(),.?""':{}|<>]"))
-            {
-                errors.Add(new { target = "Password", description = "Password must be at least 8 characters long, contain at least one lowercase letter, one uppercase letter, and at least one special character." });
-            }
-            
-            if (errors.Count > 0)
-            {
-                return BadRequest(new { errors });
-            }
-    
-            var user = new User()
-            {
-                Id = Guid.NewGuid(),
-                Name = request.Name,
-                Email = request.Email,
-                Password = request.Password
-            };
-            
-            _storage.Add(user);
-            
-            return NoContent();
+            var id = _userService.SignUp(request);
+            return Ok(new { Id = id });
         }
-        catch (Exception e)
+        catch (ApplicationException ex)
         {
-            return StatusCode(500, new { message = "Houston, we have a problem..." });
+            return BadRequest(ex);
         }
     }
 
@@ -82,25 +51,19 @@ public class UserController : ControllerBase
     [Route("[action]")]
     public IActionResult Signin(UserSigninRequest request)
     {
-       
-        try
-        {   
-            
-            var user = _storage.FirstOrDefault(u => u.Email == request.Email);
-            if (user == null)
-            {
-                return NotFound(new { message = $"User with Email: {request.Email} does not exist." });
-            }
 
-            if (user.Password != request.Password)
-            {
-                return Unauthorized();
-            }
-            return Ok(new UserResponse(user.Id, user.Name, user.Email));
-        }
-        catch
+        try
         {
-            return StatusCode(500, new { message = "Houston, we have a problem..." });
+            var user = _userService.SignIn(request);
+            return Ok(user);
+        }
+        catch (NullReferenceException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
         }
     }
 
