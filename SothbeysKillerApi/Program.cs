@@ -1,3 +1,4 @@
+using SothbeysKillerApi.Repository;
 using SothbeysKillerApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,12 +11,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddTransient<IAuctionService, DbAuctionService>();
-builder.Services.AddTransient<IUserService, DbUserService>();
-/*
- * Transient
- * Scoped
- * Singleton
- */
+
+builder.Services.AddTransient<IAuctionRepository, DbAuctionRepository>();
 
 var app = builder.Build();
 
