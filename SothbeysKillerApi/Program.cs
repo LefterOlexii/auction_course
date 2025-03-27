@@ -11,8 +11,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddTransient<IAuctionService, DbAuctionService>();
+builder.Services.AddTransient<IUserService, DbUserService>();
 
 builder.Services.AddTransient<IAuctionRepository, DbAuctionRepository>();
+builder.Services.AddTransient<IUserRepository, DbUserRepository>();
 
 var app = builder.Build();
 

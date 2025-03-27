@@ -3,38 +3,20 @@ using System.Text.RegularExpressions;
 using Dapper;
 using Npgsql;
 using SothbeysKillerApi.Controllers;
+using SothbeysKillerApi.Repository;
 
 namespace SothbeysKillerApi.Services;
 
 public class DbUserService: IUserService
 {
-    private readonly IDbConnection _dbConnection;
+    // private readonly IDbConnection _dbConnection;
+    private readonly IUserRepository _userRepository;
 
-    public DbUserService()
+    public DbUserService(IUserRepository userRepository)
     {
-        _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=postgres;Username=postgres;Password=root;");
-        _dbConnection.Open();
-
-        EnsureUsersTableExists();
-    }
-    
-    private void EnsureUsersTableExists()
-    {
-        var checkTableQuery = @"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'users');";
-        bool tableExists = _dbConnection.ExecuteScalar<bool>(checkTableQuery);
-        if (!tableExists)
-        {
-            // Створення таблиці, якщо вона не існує
-            var createTableQuery = @"
-                CREATE TABLE users (
-                    Id UUID PRIMARY KEY,
-                    Name VARCHAR(255) NOT NULL,
-                    Email VARCHAR(255) NOT NULL,
-                    Password TEXT NOT NULL
-                );";
-            _dbConnection.Execute(createTableQuery);
-
-        }
+        // _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=postgres;Username=postgres;Password=root;");
+        // _dbConnection.Open();
+        _userRepository = userRepository;
     }
     
     public Guid SignUp(UserSignupRequest request)
@@ -48,10 +30,8 @@ public class DbUserService: IUserService
         {
             throw new ArgumentException("Invalid email address");
         }
-        
-        var checkEmailCommand = "SELECT COUNT(1) FROM users WHERE email = @Email;";
-        var emailExists = _dbConnection.ExecuteScalar<int>(checkEmailCommand, new { Email = request.Email }) > 0;
-        if (emailExists)
+
+        if (_userRepository.IsEmailTaken(request.Email))
         {
             throw new ArgumentException("Email is already taken");
         }
@@ -72,17 +52,15 @@ public class DbUserService: IUserService
             Password = request.Password
         };
         
-        var command = $@"insert into users (id, name, email, password) values (@Id, @Name, @Email, @Password) returning id;";
+        var created = _userRepository.SignUp(user);
         
-        var id = _dbConnection.ExecuteScalar<Guid>(command, user);
-        
-        return id;
+        return created.Id;
     }
     
     public UserResponse SignIn(UserSigninRequest request)
     {
-        var user = _dbConnection.QueryFirstOrDefault<User>("SELECT * FROM users WHERE email = @Email LIMIT 1", new { Email = request.Email });
-        
+        var user = _userRepository.SignIn(request);
+
         if (user is null)
         {
             throw new NullReferenceException($"User with Email: {request.Email} does not exist.");
