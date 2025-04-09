@@ -12,20 +12,20 @@ var builder = WebApplication.CreateBuilder(args);
 Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddDbContext<AuctionDbContext>(opt => opt.UseNpgsql(builder.Configuration.GetConnectionString("DB")));
+builder.Services.AddDbContext<UserDbContext>(opt => opt.UseNpgsql(builder.Configuration.GetConnectionString("DB")));
 
 builder.Services.AddTransient<IAuctionService, DbAuctionService>();
 builder.Services.AddTransient<IUserService, DbUserService>();
 
-builder.Services.AddTransient<IAuctionRepository, DbAuctionRepository>();
-builder.Services.AddTransient<IUserRepository, DbUserRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 builder.Services.AddExceptionHandler<AuctionValidationExceptionHandler>();
+builder.Services.AddExceptionHandler<UserValidationExceptionHandler>();
 builder.Services.AddExceptionHandler<ServerExceptionsHandler>();
 
 builder.Services.AddProblemDetails();

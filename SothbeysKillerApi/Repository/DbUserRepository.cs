@@ -6,24 +6,22 @@ using SothbeysKillerApi.Controllers;
 namespace SothbeysKillerApi.Repository;
 
 
-public class DbUserRepository : IUserRepository, IDisposable
+public class DbUserRepository : IUserRepository
 {
     private readonly IDbConnection _dbConnection;
-    private readonly ILogger<DbUserRepository> _logger;
+    private readonly IDbTransaction _transaction;
 
-    public DbUserRepository(ILogger<DbUserRepository> logger)
+    public DbUserRepository(IDbConnection connection, IDbTransaction transaction)
     {
-        _logger = logger;
-        _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=postgres;Username=postgres;Password=root;");
-        _dbConnection.Open();
-        _logger.LogInformation($"{DateTime.Now}: connection state: {_dbConnection.State}.");
+        _dbConnection = connection;
+        _transaction = transaction;
     }
 
     public User SignUp(User entity)
     {
         var command = $@"insert into users (id, name, email, password) values (@Id, @Name, @Email, @Password) returning id;";
         
-        var user = _dbConnection.QueryFirst<User>(command, entity);
+        var user = _dbConnection.QueryFirst<User>(command, entity, transaction: _transaction);
 
         return user;
     }
@@ -33,7 +31,7 @@ public class DbUserRepository : IUserRepository, IDisposable
     {
         var command = $@"SELECT * FROM users WHERE email = @Email LIMIT 1";
         
-        var user = _dbConnection.QueryFirstOrDefault<User>(command, new { Email = request.Email });
+        var user = _dbConnection.QueryFirstOrDefault<User>(command, new { Email = request.Email }, transaction: _transaction);
 
         return user;
     }
@@ -41,14 +39,7 @@ public class DbUserRepository : IUserRepository, IDisposable
     public bool IsEmailTaken(string email)
     {
         var query = "SELECT COUNT(1) FROM users WHERE email = @Email";
-        return _dbConnection.ExecuteScalar<int>(query, new { Email = email }) > 0;
+        return _dbConnection.ExecuteScalar<int>(query, new { Email = email }, transaction: _transaction) > 0;
     }
     
-    public void Dispose()
-    {
-        _logger.LogInformation($"{DateTime.Now}: {nameof(DbAuctionRepository)} disposed.");
-        _dbConnection.Dispose();
-        
-        _logger.LogInformation($"{DateTime.Now}: connection state: {_dbConnection.State}.");
-    }
 }

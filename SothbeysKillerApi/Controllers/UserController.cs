@@ -36,15 +36,8 @@ public class UserController : ControllerBase
     [Route("[action]")]
     public IActionResult Signup(UserSignupRequest request)
     {
-        try
-        {
-            var id = _userService.SignUp(request);
-            return Ok(new { Id = id });
-        }
-        catch (ApplicationException ex)
-        {
-            return BadRequest(ex);
-        }
+        var id = _userService.SignUp(request);
+        return Ok(new { Id = id });
     }
 
     [HttpPost]

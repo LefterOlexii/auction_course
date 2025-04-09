@@ -4,36 +4,37 @@ using Dapper;
 using Npgsql;
 using SothbeysKillerApi.Controllers;
 using SothbeysKillerApi.Repository;
+using SothbeysKillerApi.Contexts;
+using SothbeysKillerApi.Exceptions;
 
 namespace SothbeysKillerApi.Services;
 
 public class DbUserService: IUserService
 {
     // private readonly IDbConnection _dbConnection;
-    private readonly IUserRepository _userRepository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly UserDbContext _userDbContext;
 
-    public DbUserService(IUserRepository userRepository)
+    public DbUserService(IUnitOfWork unitOfWork)
     {
-        // _dbConnection = new NpgsqlConnection("Server=localhost;Port=5432;Database=postgres;Username=postgres;Password=root;");
-        // _dbConnection.Open();
-        _userRepository = userRepository;
+        _unitOfWork = unitOfWork;
     }
     
     public Guid SignUp(UserSignupRequest request)
     {
         if (request.Name.Length < 3 || request.Name.Length > 255)
         {
-            throw new ArgumentException("Name must be between 3 and 255 characters");
+            throw new UserValidationException(nameof(request.Name),"Name must be between 3 and 255 characters");
         }
             
         if (!Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
         {
-            throw new ArgumentException("Invalid email address");
+            throw new UserValidationException(nameof(request.Email),"Invalid email address");
         }
 
-        if (_userRepository.IsEmailTaken(request.Email))
+        if (_unitOfWork.UserRepository.IsEmailTaken(request.Email))
         {
-            throw new ArgumentException("Email is already taken");
+            throw new UserValidationException(nameof(request.Email),"Email is already taken");
         }
         
         if (request.Password.Length < 8 || 
@@ -41,26 +42,27 @@ public class DbUserService: IUserService
             !Regex.IsMatch(request.Password, @"[A-Z]") || 
             !Regex.IsMatch(request.Password, @"[!@#$%^&*(),.?""':{}|<>]"))
         {
-            throw new ArgumentException("Password must be at least 8 characters long, contain at least one lowercase letter, one uppercase letter, and at least one special character.");
+            throw new UserValidationException(nameof(request.Password),"Password must be at least 8 characters long, contain at least one lowercase letter, one uppercase letter, and at least one special character.");
         }
     
         var user = new User()
         {
-            Id = Guid.NewGuid(),
             Name = request.Name,
             Email = request.Email,
             Password = request.Password
         };
+
+        _userDbContext.Type.Add(user);
         
-        var created = _userRepository.SignUp(user);
+        _userDbContext.SaveChanges();
         
-        return created.Id;
+        return user.Id;
     }
     
     public UserResponse SignIn(UserSigninRequest request)
     {
-        var user = _userRepository.SignIn(request);
-
+        var user = _userDbContext.Type.FirstOrDefault(a => a.Email == request.Email);
+        
         if (user is null)
         {
             throw new NullReferenceException($"User with Email: {request.Email} does not exist.");
