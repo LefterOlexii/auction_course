@@ -1,20 +1,24 @@
-﻿using SothbeysKillerApi.Controllers;
+﻿using Microsoft.EntityFrameworkCore;
+using SothbeysKillerApi.Contexts;
+using SothbeysKillerApi.Controllers;
+using SothbeysKillerApi.Exceptions;
 using SothbeysKillerApi.Repository;
 
 namespace SothbeysKillerApi.Services;
 
 public class DbAuctionService : IAuctionService
 {
-    private readonly IAuctionRepository _auctionRepository;
-    
-    public DbAuctionService(IAuctionRepository auctionRepository)
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly AuctionDbContext _auctionDbContext;
+
+    public DbAuctionService(IUnitOfWork unitOfWork)
     {
-        _auctionRepository = auctionRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public List<AuctionResponse> GetPastAuctions()
     {
-        var auctions = _auctionRepository.GetPast();
+        var auctions = _unitOfWork.AuctionRepository.GetPast();
 
         return auctions
             .Select(auction => new AuctionResponse(auction.Id, auction.Title, auction.Start, auction.Finish))
@@ -23,8 +27,8 @@ public class DbAuctionService : IAuctionService
     
     public List<AuctionResponse> GetActiveAuctions()
     {
-        var auctions = _auctionRepository.GetActive();
-
+        var auctions = _unitOfWork.AuctionRepository.GetActive();
+        
         return auctions
             .Select(auction => new AuctionResponse(auction.Id, auction.Title, auction.Start, auction.Finish))
             .ToList();
@@ -32,7 +36,7 @@ public class DbAuctionService : IAuctionService
     
     public List<AuctionResponse> GetFutureAuctions()
     {
-        var auctions = _auctionRepository.GetFuture();
+        var auctions = _unitOfWork.AuctionRepository.GetFuture();
 
         return auctions
             .Select(auction => new AuctionResponse(auction.Id, auction.Title, auction.Start, auction.Finish))
@@ -43,35 +47,36 @@ public class DbAuctionService : IAuctionService
     {
         if (request.Title.Length < 3 || request.Title.Length > 255)
         {
-            throw new ArgumentException();
+            throw new AuctionValidationException(nameof(request.Title), "Invalid length.");
         }
         
         if (request.Start < DateTime.Now)
         {
-            throw new ArgumentException();
+            throw new AuctionValidationException(nameof(request.Start), "Invalid start.");
         }
         
         if (request.Finish <= request.Start)
         {
-            throw new ArgumentException();
+            throw new AuctionValidationException(nameof(request.Finish), "Invalid finish.");
         }
         
         var auction = new Auction()
         {
-            Id = Guid.NewGuid(),
             Title = request.Title,
             Start = request.Start,
             Finish = request.Finish
         };
 
-        var created = _auctionRepository.Create(auction);
+        _auctionDbContext.Type.Add(auction);
 
-        return created.Id;
+        _auctionDbContext.SaveChanges();
+        
+        return auction.Id;
     }
-
+    
     public AuctionResponse GetAuctionById(Guid id)
     {
-        var auction = _auctionRepository.GetById(id);
+        var auction = _unitOfWork.AuctionRepository.GetById(id);
 
         if (auction is null)
         {
@@ -85,7 +90,7 @@ public class DbAuctionService : IAuctionService
 
     public void UpdateAuction(Guid id, AuctionUpdateRequest request)
     {
-        var auction = _auctionRepository.GetById(id);
+        var auction = _auctionDbContext.Type.FirstOrDefault(a => a.Id == id);
         
         if (auction is null)
         {
@@ -110,12 +115,19 @@ public class DbAuctionService : IAuctionService
         auction.Start = request.Start;
         auction.Finish = request.Finish;
 
-        _auctionRepository.Update(auction);
+        _auctionDbContext.Type.Update(auction); // 1
+
+        _auctionDbContext.Entry(auction).State = EntityState.Unchanged;
+        
+        auction.Start = request.Start;
+        auction.Finish = request.Finish;
+
+        _auctionDbContext.SaveChanges();
     }
 
     public void DeleteAuction(Guid id)
     {
-        var auction = _auctionRepository.GetById(id);
+        var auction = _auctionDbContext.Type.FirstOrDefault(a => a.Id == id);
         
         if (auction is null)
         {
@@ -127,6 +139,8 @@ public class DbAuctionService : IAuctionService
             throw new ArgumentException();
         }
 
-        _auctionRepository.Delete(id);
+        _auctionDbContext.Type.Remove(auction);
+
+        _auctionDbContext.SaveChanges();
     }
 }
